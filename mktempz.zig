@@ -77,18 +77,19 @@ const words = [369]u32{
 
 /// State transition table to decompress huffman-encoded words
 const states = [53]i8{
-     -1,  -3, -33,  -5, -15,  -7,  -9, 116, 111, -11, 115, -13, 117, 119,
-    118, -17, -31, -19, -21, 109, 100, -23, 103, 102, -25, 122, -27, -29,
-    106, 113, 120, 108, 114, -35, -41,  30, -37, -39, 105, 104,  99, -43,
-    -51, 110, -45, -47, -49, 112, 107,  98, 121,  97, 101,
+      -1,   -3,  -33,   -5,  -15,   -7,   -9,  't',  'o',  -11,  's',  -13,
+     'u',  'w',  'v',  -17,  -31,  -19,  -21,  'm',  'd',  -23,  'g',  'f',
+     -25,  'z',  -27,  -29,  'j',  'q',  'x',  'l',  'r',  -35,  -41, 0x1e,
+     -37,  -39,  'i',  'h',  'c',  -43,  -51,  'n',  -45,  -47,  -49,  'p',
+     'k',  'b',  'y',  'a',  'e',
 };
 
 fn next(c: *u8, offset: usize) usize {
     var n = offset;
     var state: u8 = 0;
     while (states[state] < 0) : (n += 1) {
-        const b = @intCast(i32, words[n >> 5] >> @truncate(u5, n) & 1);
-        state = @intCast(u8, b - states[state]);
+        const b = @truncate(u1, words[n >> 5] >> @truncate(u5, n));
+        state = b -% @bitCast(u8, states[state]);
     }
 
     c.* = @intCast(u8, states[state]);
@@ -96,6 +97,8 @@ fn next(c: *u8, offset: usize) usize {
 }
 
 fn lookup(buf: []u8, target: usize) [:0x1e]u8 {
+    std.debug.assert(target < 344);
+
     var n: usize = 0;
     var c: u8 = 0;
 
@@ -118,7 +121,6 @@ fn lookup(buf: []u8, target: usize) [:0x1e]u8 {
 
 pub fn main() !u8 {
     const seed = @truncate(u64, @bitCast(u128, std.time.nanoTimestamp()));
-
     var prng_state = std.rand.DefaultPrng.init(seed);
     const prng = prng_state.random();
 
@@ -143,11 +145,11 @@ pub fn main() !u8 {
     return 0;
 }
 
-test "valid lookup" {
+test "valid lookups" {
     var buf = [_]u8{0} ** 16;
 
     try expectEqualStrings("admiring", lookup(buf[0..], 0));
-
     try expectEqualStrings("boring", lookup(buf[0..], 10));
     try expectEqualStrings("wozniak", lookup(buf[0..], 338));
+    try expectEqualStrings("zhukovsky", lookup(buf[0..], 343));
 }
