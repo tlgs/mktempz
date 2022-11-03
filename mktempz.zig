@@ -1,8 +1,11 @@
+//! This program mimics `mktemp -d` but the generated directory name
+//! is drawn from two wordlists; Exactly like how Docker generates container names.
 const std = @import("std");
 const expectEqualStrings = std.testing.expectEqualStrings;
 const stdout = std.io.getStdOut().writer();
 const stderr = std.io.getStdErr().writer();
 
+/// Huffman-encoded wordlist
 const words = [369]u32{
     0x8f7b4527, 0x1ef449ce, 0xaf94539d, 0x9f0738d0, 0x2f070dd3, 0x3d54e273,
     0xf7da373a, 0xe28cf11c, 0x6851fdb3, 0x6b365a85, 0x365a8566, 0xbd0d9934,
@@ -68,6 +71,7 @@ const words = [369]u32{
     0x5544a0e7, 0xaf248ae8, 0x0000007b,
 };
 
+/// State transition table to decompress huffman-encoded words
 const states = [53]i8{
      -1,  -3, -33,  -5, -15,  -7,  -9, 116, 111, -11, 115, -13, 117, 119,
     118, -17, -31, -19, -21, 109, 100, -23, 103, 102, -25, 122, -27, -29,
@@ -112,9 +116,12 @@ pub fn main() u8 {
     const seed = @truncate(u64, @bitCast(u128, std.time.nanoTimestamp()));
     const prng = std.rand.DefaultPrng.init(seed).random();
 
-    // each word has a maximum length of 14 (13 + 1 record separator)
+    // each word has a maximum length of 14 (13 + 1 record separator);
     // a buffer of length 32 is enough to keep both words
     var buf = [_]u8{0} ** 32;
+
+    // randomly lookup two words from the wordlist
+    // (it's actually two concatenated wordlists with lengths 108 and 236)
     const left = lookup(buf[0..], prng.uintLessThan(u16, 108));
     const right = lookup(buf[16..], 108 + prng.uintLessThan(u16, 236));
 
