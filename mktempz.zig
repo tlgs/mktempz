@@ -90,6 +90,8 @@ fn next(c: *u8, offset: usize) usize {
 fn lookup(buf: []u8, target: usize) [:0x1e]u8 {
     var n: usize = 0;
     var c: u8 = 0;
+
+    // skip ahead
     var word_count: u32 = 0;
     while (word_count < target) : ({ c = 0; word_count += 1; }) {
         while (c != 0x1e) {
@@ -97,34 +99,35 @@ fn lookup(buf: []u8, target: usize) [:0x1e]u8 {
         }
     }
 
+    // write word to buffer
     var i: u8 = 0;
     while (c != 0x1e) : (i += 1) {
         n = next(&c, n);
         buf[i] = c;
     }
-
     return buf[0..i-1 :0x1e];
 }
 
-pub fn main() void {
+pub fn main() u8 {
     const seed = @truncate(u64, @bitCast(u128, std.time.nanoTimestamp()));
     const prng = std.rand.DefaultPrng.init(seed).random();
 
     // each word has a maximum length of 14 (13 + 1 record separator)
     // a buffer of length 32 is enough to keep both words
     var buf = [_]u8{0} ** 32;
-    const left = lookup(buf[0..], prng.uintLessThan(u8, 108));
-    const right = lookup(buf[16..], 108 + prng.uintLessThan(u8, 236));
+    const left = lookup(buf[0..], prng.uintLessThan(u16, 108));
+    const right = lookup(buf[16..], 108 + prng.uintLessThan(u16, 236));
 
     var buf2: [64]u8 = undefined;
     const path = std.fmt.bufPrint(buf2[0..], "/tmp/{s}-{s}", .{ left, right }) catch unreachable;
 
     std.os.mkdir(path, 0o700) catch |e| {
         stderr.print("could not create directory: {}\n", .{e}) catch unreachable;
-        std.os.exit(1);
+        return 1;
     };
 
     stdout.print("{s}\n", .{path}) catch unreachable;
+    return 0;
 }
 
 test "valid lookup" {
