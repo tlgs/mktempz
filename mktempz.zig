@@ -1,6 +1,5 @@
 const std = @import("std");
-const expect = std.testing.expect;
-const mem = std.mem;
+const expectEqualStrings = std.testing.expectEqualStrings;
 const stdout = std.io.getStdOut().writer();
 const stderr = std.io.getStdErr().writer();
 
@@ -88,12 +87,11 @@ fn next(c: *u8, offset: usize) usize {
     return n;
 }
 
-fn lookup(buf: []u8, target: usize, offset: usize) [:0x1e]u8 {
-    var n = offset;
-
+fn lookup(buf: []u8, target: usize) [:0x1e]u8 {
+    var n: usize = 0;
     var c: u8 = 0;
-    var count: u32 = 0;
-    while (count < target) : ({ c = 0; count += 1; }) {
+    var word_count: u32 = 0;
+    while (word_count < target) : ({ c = 0; word_count += 1; }) {
         while (c != 0x1e) {
             n = next(&c, n);
         }
@@ -115,8 +113,8 @@ pub fn main() void {
     // each word has a maximum length of 14 (13 + 1 record separator)
     // a buffer of length 32 is enough to keep both words
     var buf = [_]u8{0} ** 32;
-    const left = lookup(buf[0..], prng.uintLessThan(u8, 108), 0);
-    const right = lookup(buf[16..], prng.uintLessThan(u8, 236), 3864);
+    const left = lookup(buf[0..], prng.uintLessThan(u8, 108));
+    const right = lookup(buf[16..], 108 + prng.uintLessThan(u8, 236));
 
     var buf2: [64]u8 = undefined;
     const path = std.fmt.bufPrint(buf2[0..], "/tmp/{s}-{s}", .{ left, right }) catch unreachable;
@@ -129,21 +127,11 @@ pub fn main() void {
     stdout.print("{s}\n", .{path}) catch unreachable;
 }
 
-test "without offset" {
+test "valid lookup" {
     var buf = [_]u8{0} ** 16;
 
-    try expect(mem.eql(u8, lookup(buf[0..], 0, 0), "admiring"));
+    try expectEqualStrings("admiring", lookup(buf[0..], 0));
 
-    try expect(mem.eql(u8, lookup(buf[0..], 10, 0), "boring"));
-    try expect(mem.eql(u8, lookup(buf[0..], 338, 0), "wozniak"));
-}
-
-test "with offset" {
-    var buf = [_]u8{0} ** 16;
-
-    // these offsets are calculates a priori
-    try expect(mem.eql(u8, lookup(buf[0..], 0, 38), "adoring"));
-
-    try expect(mem.eql(u8, lookup(buf[0..], 9, 38), "boring"));
-    try expect(mem.eql(u8, lookup(buf[0..], 230, 3864), "wozniak"));
+    try expectEqualStrings("boring", lookup(buf[0..], 10));
+    try expectEqualStrings("wozniak", lookup(buf[0..], 338));
 }
