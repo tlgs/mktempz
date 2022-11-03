@@ -9,7 +9,7 @@ const expectEqualStrings = std.testing.expectEqualStrings;
 const stdout = std.io.getStdOut().writer();
 const stderr = std.io.getStdErr().writer();
 
-/// Huffman-encoded wordlist
+/// Huffman-encoded wordlist, using RS (0x1e) as a delimiter
 const words = [369]u32{
     0x8f7b4527, 0x1ef449ce, 0xaf94539d, 0x9f0738d0, 0x2f070dd3, 0x3d54e273,
     0xf7da373a, 0xe28cf11c, 0x6851fdb3, 0x6b365a85, 0x365a8566, 0xbd0d9934,
@@ -113,12 +113,14 @@ fn lookup(buf: []u8, target: usize) [:0x1e]u8 {
         n = next(&c, n);
         buf[i] = c;
     }
-    return buf[0..i-1 :0x1e];
+    return buf[0 .. i - 1 :0x1e];
 }
 
-pub fn main() u8 {
+pub fn main() !u8 {
     const seed = @truncate(u64, @bitCast(u128, std.time.nanoTimestamp()));
-    const prng = std.rand.DefaultPrng.init(seed).random();
+
+    var prng_state = std.rand.DefaultPrng.init(seed);
+    const prng = prng_state.random();
 
     // each word has a maximum length of 14 (13 + 1 record separator);
     // a buffer of length 32 is enough to keep both words
@@ -130,14 +132,14 @@ pub fn main() u8 {
     const right = lookup(buf[16..], 108 + prng.uintLessThan(u16, 236));
 
     var buf2: [64]u8 = undefined;
-    const path = std.fmt.bufPrint(buf2[0..], "/tmp/{s}-{s}", .{ left, right }) catch unreachable;
+    const path = try std.fmt.bufPrint(buf2[0..], "/tmp/{s}-{s}", .{ left, right });
 
     std.os.mkdir(path, 0o700) catch |e| {
-        stderr.print("could not create directory: {}\n", .{e}) catch unreachable;
+        try stderr.print("could not create directory: {}\n", .{e});
         return 1;
     };
 
-    stdout.print("{s}\n", .{path}) catch unreachable;
+    try stdout.print("{s}\n", .{path});
     return 0;
 }
 
