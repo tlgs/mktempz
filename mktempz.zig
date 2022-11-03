@@ -70,44 +70,53 @@ const words = [369]u32{
 };
 
 const states = [53]i8{
-    -1,  -3,  -33, -5,  -15, -7,  -9,  116, 111, -11, 115, -13, 117, 119,
+     -1,  -3, -33,  -5, -15,  -7,  -9, 116, 111, -11, 115, -13, 117, 119,
     118, -17, -31, -19, -21, 109, 100, -23, 103, 102, -25, 122, -27, -29,
-    106, 113, 120, 108, 114, -35, -41, 30,  -37, -39, 105, 104, 99,  -43,
-    -51, 110, -45, -47, -49, 112, 107, 98,  121, 97,  101,
+    106, 113, 120, 108, 114, -35, -41,  30, -37, -39, 105, 104,  99, -43,
+    -51, 110, -45, -47, -49, 112, 107,  98, 121,  97, 101,
 };
 
-fn get(buf: []u8, target: usize, offset_bits: usize) [:0]u8 {
-    var n = offset_bits;
-    var count: u8 = 0;
-    var i: u8 = 0;
-    while (count <= target) : (count += 1) {
-        i = 0;
-        while (true) : (i += 1) {
-            var state: u8 = 0;
-            while (states[state] < 0) : (n += 1) {
-                const b = @intCast(i32, words[n >> 5] >> @truncate(u5, n) & 1);
-                state = @intCast(u8, b - states[state]);
-            }
+fn next(c: *u8, offset: usize) usize {
+    var n = offset;
+    var state: u8 = 0;
+    while (states[state] < 0) : (n += 1) {
+        const b = @intCast(i32, words[n >> 5] >> @truncate(u5, n) & 1);
+        state = @intCast(u8, b - states[state]);
+    }
 
-            if (states[state] == 0x1e) {
-                break;
-            }
+    c.* = @intCast(u8, states[state]);
+    return n;
+}
 
-            buf[i] = @intCast(u8, states[state]);
+fn lookup(buf: []u8, target: usize, offset: usize) [:0x1e]u8 {
+    var n = offset;
+
+    var c: u8 = 0;
+    var count: u32 = 0;
+    while (count < target) : ({ c = 0; count += 1; }) {
+        while (c != 0x1e) {
+            n = next(&c, n);
         }
     }
 
-    buf[i] = 0x00;
-    return buf[0..i :0];
+    var i: u8 = 0;
+    while (c != 0x1e) : (i += 1) {
+        n = next(&c, n);
+        buf[i] = c;
+    }
+
+    return buf[0..i-1 :0x1e];
 }
 
 pub fn main() void {
     const seed = @truncate(u64, @bitCast(u128, std.time.nanoTimestamp()));
     const prng = std.rand.DefaultPrng.init(seed).random();
 
+    // each word has a maximum length of 14 (13 + 1 record separator)
+    // a buffer of length 32 is enough to keep both words
     var buf = [_]u8{0} ** 32;
-    const left = get(buf[0..], prng.uintLessThan(u8, 108), 0);
-    const right = get(buf[16..], prng.uintLessThan(u8, 236), 3864);
+    const left = lookup(buf[0..], prng.uintLessThan(u8, 108), 0);
+    const right = lookup(buf[16..], prng.uintLessThan(u8, 236), 3864);
 
     var buf2: [64]u8 = undefined;
     const path = std.fmt.bufPrint(buf2[0..], "/tmp/{s}-{s}", .{ left, right }) catch unreachable;
@@ -123,14 +132,18 @@ pub fn main() void {
 test "without offset" {
     var buf = [_]u8{0} ** 16;
 
-    try expect(mem.eql(u8, get(buf[0..], 102, 0), "wizardly"));
-    try expect(mem.eql(u8, get(buf[0..], 124, 0), "bell"));
+    try expect(mem.eql(u8, lookup(buf[0..], 0, 0), "admiring"));
+
+    try expect(mem.eql(u8, lookup(buf[0..], 10, 0), "boring"));
+    try expect(mem.eql(u8, lookup(buf[0..], 338, 0), "wozniak"));
 }
 
 test "with offset" {
     var buf = [_]u8{0} ** 16;
 
     // these offsets are calculates a priori
-    try expect(mem.eql(u8, get(buf[0..], 101, 38), "wizardly"));
-    try expect(mem.eql(u8, get(buf[0..], 16, 3864), "bell"));
+    try expect(mem.eql(u8, lookup(buf[0..], 0, 38), "adoring"));
+
+    try expect(mem.eql(u8, lookup(buf[0..], 9, 38), "boring"));
+    try expect(mem.eql(u8, lookup(buf[0..], 230, 3864), "wozniak"));
 }
