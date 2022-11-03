@@ -1,5 +1,9 @@
 //! This program mimics `mktemp -d` but the generated directory name
 //! is drawn from two wordlists; Exactly like how Docker generates container names.
+//!
+//! The wordlist compression, embedding, and deflating follow the techniques in:
+//! https://nullprogram.com/blog/2022/03/07/
+
 const std = @import("std");
 const expectEqualStrings = std.testing.expectEqualStrings;
 const stdout = std.io.getStdOut().writer();
