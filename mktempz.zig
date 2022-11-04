@@ -102,15 +102,14 @@ fn lookup(buf: []u8, target: usize) [:0x1e]u8 {
     var n: usize = 0;
     var c: u8 = 0;
 
-    // skip ahead
-    var word_count: u32 = 0;
-    while (word_count < target) : ({ c = 0; word_count += 1; }) {
-        while (c != 0x1e) {
-            n = next(&c, n);
-        }
+    // skip ahead to target
+    var word_count: u16 = 0;
+    while (word_count < target) : (word_count += 1) {
+        while (c != 0x1e) { n = next(&c, n); }
+        c = 0;
     }
 
-    // write word to buffer
+    // write target word to buffer
     var i: u8 = 0;
     while (c != 0x1e) : (i += 1) {
         n = next(&c, n);
@@ -147,7 +146,6 @@ pub fn main() !u8 {
 
 test "valid lookups" {
     var buf = [_]u8{0} ** 16;
-
     try expectEqualStrings("admiring", lookup(buf[0..], 0));
     try expectEqualStrings("boring", lookup(buf[0..], 10));
     try expectEqualStrings("wozniak", lookup(buf[0..], 338));
