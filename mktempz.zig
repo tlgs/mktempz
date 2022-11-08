@@ -132,6 +132,11 @@ pub fn main() !u8 {
     const left = lookup(buf[0..], prng.uintLessThan(u16, 108));
     const right = lookup(buf[16..], 108 + prng.uintLessThan(u16, 236));
 
+    // choosing the base directory is _obviously_ not as simple as defaulting to `/tmp`.
+    // see Python's tempfile module:
+    // https://github.com/python/cpython/blob/3.11/Lib/tempfile.py#L156
+    // and see coreutils's mktemp.c:
+    // https://github.com/coreutils/coreutils/blob/v9.1/src/mktemp.c#L263
     var buf2: [64]u8 = undefined;
     const path = try std.fmt.bufPrint(buf2[0..], "/tmp/{s}-{s}", .{ left, right });
 
