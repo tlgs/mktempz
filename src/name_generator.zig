@@ -1,13 +1,10 @@
-//! This program mimics `mktemp -d` but the generated directory name
-//! is drawn from two wordlists; Exactly like how Docker generates container names.
+//! TODO: Namespace description
 //!
 //! The wordlist compression, embedding, and deflating follow the techniques in:
 //! https://nullprogram.com/blog/2022/03/07/
 
 const std = @import("std");
 const expectEqualStrings = std.testing.expectEqualStrings;
-const stdout = std.io.getStdOut().writer();
-const stderr = std.io.getStdErr().writer();
 
 /// Huffman-encoded wordlist, using RS (0x1e) as a delimiter
 const words = [369]u32{
@@ -118,41 +115,45 @@ fn lookup(buf: []u8, target: usize) [:0x1e]u8 {
     return buf[0 .. i - 1 :0x1e];
 }
 
-pub fn main() !u8 {
-    const seed = @truncate(u64, @bitCast(u128, std.time.nanoTimestamp()));
-    var prng_state = std.rand.DefaultPrng.init(seed);
-    const prng = prng_state.random();
-
-    // each word has a maximum length of 14 (13 + 1 record separator);
-    // a buffer of length 32 is enough to keep both words
-    var buf = [_]u8{0} ** 32;
-
-    // randomly lookup two words from the wordlist
-    // (it's actually two concatenated wordlists with lengths 108 and 236)
-    const left = lookup(buf[0..], prng.uintLessThan(u16, 108));
-    const right = lookup(buf[16..], 108 + prng.uintLessThan(u16, 236));
-
-    // choosing the base directory is _obviously_ not as simple as defaulting to `/tmp`.
-    // see Python's tempfile module:
-    // https://github.com/python/cpython/blob/3.11/Lib/tempfile.py#L156
-    // and see coreutils's mktemp.c:
-    // https://github.com/coreutils/coreutils/blob/v9.1/src/mktemp.c#L263
-    var buf2: [64]u8 = undefined;
-    const path = try std.fmt.bufPrint(buf2[0..], "/tmp/{s}-{s}", .{ left, right });
-
-    std.os.mkdir(path, 0o700) catch |e| {
-        try stderr.print("could not create directory: {}\n", .{e});
-        return 1;
-    };
-
-    try stdout.print("{s}\n", .{path});
-    return 0;
-}
-
 test "valid lookups" {
     var buf = [_]u8{0} ** 16;
     try expectEqualStrings("admiring", lookup(buf[0..], 0));
     try expectEqualStrings("boring", lookup(buf[0..], 10));
     try expectEqualStrings("wozniak", lookup(buf[0..], 338));
     try expectEqualStrings("zhukovsky", lookup(buf[0..], 343));
+}
+
+pub const NameGenerator = struct {
+    random: std.rand.Random,
+    buf: [64]u8 = undefined,
+
+    pub fn init(random: std.rand.Random) NameGenerator {
+        return NameGenerator {.random = random};
+    }
+
+    pub fn next(self: *NameGenerator) [:0]u8 {
+        // each word has a maximum length of 14 (13 + 1 record separator);
+        // a buffer of length 32 is enough to keep both words
+        var b = [_]u8{0} ** 32;
+
+        // randomly lookup two words from the wordlist
+        // (it's actually two concatenated wordlists with lengths 108 and 236)
+        const left = lookup(b[0..], self.random.uintLessThan(u16, 108));
+        const right = lookup(b[16..], 108 + self.random.uintLessThan(u16, 236));
+
+        const path = std.fmt.bufPrintZ(self.buf[0..], "{s}-{s}", .{left, right}) catch unreachable;
+
+        return path;
+    }
+};
+
+test "basic name generation" {
+    var prng_state = std.rand.DefaultPrng.init(42);
+    const prng = prng_state.random();
+
+    var ng = NameGenerator.init(prng);
+
+    try expectEqualStrings(ng.next(), "elastic-ganguly");
+    try expectEqualStrings(ng.next(), "angry-banzai");
+    try expectEqualStrings(ng.next(), "hopeful-feistel");
 }
