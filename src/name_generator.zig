@@ -72,6 +72,8 @@ const words = [369]u32{
     0x5544a0e7, 0xaf248ae8, 0x0000007b,
 };
 
+// zig fmt: off
+
 /// State transition table to decompress huffman-encoded words
 const states = [53]i8{
       -1,   -3,  -33,   -5,  -15,   -7,   -9,  't',  'o',  -11,  's',  -13,
@@ -80,6 +82,8 @@ const states = [53]i8{
      -37,  -39,  'i',  'h',  'c',  -43,  -51,  'n',  -45,  -47,  -49,  'p',
      'k',  'b',  'y',  'a',  'e',
 };
+
+// zig fmt: on
 
 fn next(c: *u8, offset: usize) usize {
     var n = offset;
@@ -102,7 +106,9 @@ fn lookup(buf: []u8, target: usize) [:0x1e]u8 {
     // skip ahead to target
     var word_count: u16 = 0;
     while (word_count < target) : (word_count += 1) {
-        while (c != 0x1e) { n = next(&c, n); }
+        while (c != 0x1e) {
+            n = next(&c, n);
+        }
         c = 0;
     }
 
@@ -128,7 +134,7 @@ pub const NameGenerator = struct {
     buf: [64]u8 = undefined,
 
     pub fn init(random: std.rand.Random) NameGenerator {
-        return NameGenerator {.random = random};
+        return NameGenerator{ .random = random };
     }
 
     pub fn next(self: *NameGenerator) [:0]u8 {
@@ -141,7 +147,7 @@ pub const NameGenerator = struct {
         const left = lookup(b[0..], self.random.uintLessThan(u16, 108));
         const right = lookup(b[16..], 108 + self.random.uintLessThan(u16, 236));
 
-        const path = std.fmt.bufPrintZ(self.buf[0..], "{s}-{s}", .{left, right}) catch unreachable;
+        const path = std.fmt.bufPrintZ(self.buf[0..], "{s}-{s}", .{ left, right }) catch unreachable;
 
         return path;
     }
